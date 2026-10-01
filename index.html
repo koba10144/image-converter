@@ -4,15 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>画像コンバーター</title>
+<script>
+(function(){var t;try{t=localStorage.getItem("theme")}catch(e){}
+if(t!=="light"&&t!=="dark")t=matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light";
+document.documentElement.dataset.theme=t;})();
+</script>
 <style>
 :root{
   --bg:#f4f6fb; --card:#fff; --text:#1d2433; --muted:#6b7488; --line:#e3e7f0;
   --accent:#4f6bff; --accent2:#8a5cff; --accent-soft:#eef1ff; --ok:#16a34a; --err:#dc2626;
   --shadow:0 8px 30px rgba(30,40,80,.08);
 }
-@media (prefers-color-scheme:dark){
-  :root{--bg:#0f1320; --card:#181d2e; --text:#e8ecf7; --muted:#8b95b0; --line:#2a3148; --accent-soft:#232a47; --shadow:0 8px 30px rgba(0,0,0,.4)}
+html[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#000; --card:#111114; --text:#ececf1; --muted:#8a8f9e; --line:#26262c; --accent-soft:#1a1c2e; --shadow:0 8px 30px rgba(0,0,0,.6);
 }
+.theme{position:absolute;top:16px;right:16px;display:flex;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px;gap:2px}
+.theme button{border:0;background:transparent;color:var(--muted);font-size:13px;font-weight:600;padding:6px 14px;border-radius:9px;cursor:pointer}
+.theme button.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+header{position:relative}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Segoe UI",sans-serif;line-height:1.6}
 .wrap{max-width:960px;margin:0 auto;padding:32px 16px 64px}
@@ -58,12 +68,13 @@ input[type=color]{padding:2px;width:48px;height:34px;cursor:pointer}
 .acts .btn{padding:7px 12px;font-size:13px}
 .empty{text-align:center;color:var(--muted);padding:18px 0;font-size:14px}
 footer{text-align:center;color:var(--muted);font-size:12px;margin-top:24px}
-@media(max-width:520px){.item{grid-template-columns:48px 1fr}.acts{grid-column:1/-1}.thumb{width:48px;height:48px}}
+@media(max-width:520px){.theme{position:static;justify-content:center;margin:0 auto 14px;width:max-content}.item{grid-template-columns:48px 1fr}.acts{grid-column:1/-1}.thumb{width:48px;height:48px}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
+    <div class="theme" role="tablist" aria-label="テーマ切替"><button role="tab" data-t="light">☀ ライト</button><button role="tab" data-t="dark">🌙 ダーク</button></div>
     <h1>画像コンバーター</h1>
     <p>ブラウザ内で完結。画像はサーバーに送信されません。</p>
   </header>
@@ -85,11 +96,11 @@ footer{text-align:center;color:var(--muted);font-size:12px;margin-top:24px}
       <div id="qWrap">
         <span class="label">画質</span>
         <div class="row"><input type="range" id="quality" min="1" max="100" value="90"><span class="val" id="qVal">90%</span></div>
-        <div class="hint">JPEG / WebP / AVIF に適用</div>
+        <div class="hint">JPEG / WebP / AVIF / PDF に適用</div>
       </div>
       <div id="bgWrap">
         <span class="label">背景色(透過部分)</span>
-        <div class="row"><input type="color" id="bg" value="#ffffff"><span class="hint" style="margin:0">JPEG / BMP は透過非対応のため塗りつぶし</span></div>
+        <div class="row"><input type="color" id="bg" value="#ffffff"><span class="hint" style="margin:0">JPEG / BMP / PDF は透過非対応のため塗りつぶし</span></div>
       </div>
       <div>
         <span class="label">サイズ変更(任意)</span>
@@ -123,10 +134,20 @@ const FORMATS = [
   {id:"gif",  label:"GIF",  mime:"image/gif",  ext:"gif"},
   {id:"bmp",  label:"BMP",  mime:"image/bmp",  ext:"bmp"},
   {id:"ico",  label:"ICO",  mime:"image/x-icon", ext:"ico"},
+  {id:"pdf",  label:"PDF",  mime:"application/pdf", ext:"pdf"},
 ];
 let current = "png";
 let items = []; // {id,file,img,w,h,url,blob,outName,error}
 let seq = 0;
+
+/* ---------- テーマ ---------- */
+function setTheme(t){
+  document.documentElement.dataset.theme=t;
+  try{localStorage.setItem("theme",t)}catch(e){}
+  document.querySelectorAll(".theme button").forEach(b=>{const on=b.dataset.t===t;b.classList.toggle("on",on);b.setAttribute("aria-selected",on);});
+}
+document.querySelectorAll(".theme button").forEach(b=>b.onclick=()=>setTheme(b.dataset.t));
+setTheme(document.documentElement.dataset.theme);
 
 /* ---------- UI ---------- */
 const fmtBox = $("formats");
@@ -143,8 +164,8 @@ function renderFormats(){
   }
 }
 function updateOpts(){
-  $("qWrap").style.opacity = ["jpeg","webp","avif"].includes(current) ? 1 : .4;
-  $("bgWrap").style.opacity = ["jpeg","bmp"].includes(current) ? 1 : .4;
+  $("qWrap").style.opacity = ["jpeg","webp","avif","pdf"].includes(current) ? 1 : .4;
+  $("bgWrap").style.opacity = ["jpeg","bmp","pdf"].includes(current) ? 1 : .4;
 }
 // AVIF 対応検出
 (async()=>{
@@ -205,7 +226,7 @@ function drawCanvas(it){
   if(current==="ico" && Math.max(w,h)>256){ const s=256/Math.max(w,h); w=Math.max(1,Math.round(w*s)); h=Math.max(1,Math.round(h*s)); }
   const c = document.createElement("canvas"); c.width=w; c.height=h;
   const ctx = c.getContext("2d",{willReadFrequently:true});
-  if(["jpeg","bmp"].includes(current)){ ctx.fillStyle=$("bg").value; ctx.fillRect(0,0,w,h); }
+  if(["jpeg","bmp","pdf"].includes(current)){ ctx.fillStyle=$("bg").value; ctx.fillRect(0,0,w,h); }
   ctx.imageSmoothingQuality="high";
   ctx.drawImage(it.img,0,0,w,h);
   return c;
@@ -225,6 +246,7 @@ async function encode(c){
     case "bmp": return encodeBMP(c);
     case "gif": return encodeGIF(c);
     case "ico": return encodeICO(c);
+    case "pdf": return encodePDF(c,q);
   }
 }
 async function convertAll(){
@@ -265,6 +287,25 @@ async function encodeICO(c){
   v.setUint16(10,1,true); v.setUint16(12,32,true); v.setUint32(14,png.length,true); v.setUint32(18,22,true);
   buf.set(png,22);
   return new Blob([buf],{type:"image/x-icon"});
+}
+async function encodePDF(c,q){
+  // JPEG を DCTDecode で埋め込んだ1ページPDF。ページサイズは 96dpi 換算(px×0.75pt)
+  const jpg=new Uint8Array(await (await toBlob(c,"image/jpeg",q)).arrayBuffer());
+  const W=+(c.width*0.75).toFixed(2), H=+(c.height*0.75).toFixed(2), enc=new TextEncoder();
+  const content=`q ${W} 0 0 ${H} 0 0 cm /Im0 Do Q`;
+  const chunks=[], offs=[]; let pos=0;
+  const put=d=>{const u=typeof d==="string"?enc.encode(d):d; chunks.push(u); pos+=u.length;};
+  put("%PDF-1.4\n");
+  const obj=(n,body,stream)=>{offs[n]=pos; put(`${n} 0 obj\n${body}\n`); if(stream){put("stream\n");put(stream);put("\nendstream\n");} put("endobj\n");};
+  obj(1,"<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2,"<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
+  obj(3,`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${W} ${H}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`);
+  obj(4,`<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>`,jpg);
+  obj(5,`<< /Length ${content.length} >>`,content);
+  const xref=pos; put("xref\n0 6\n0000000000 65535 f \n");
+  for(let n=1;n<=5;n++) put(String(offs[n]).padStart(10,"0")+" 00000 n \n");
+  put(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(chunks,{type:"application/pdf"});
 }
 function encodeGIF(c){
   const w=c.width,h=c.height, src=c.getContext("2d").getImageData(0,0,w,h).data;
