@@ -1,0 +1,11 @@
+# 画像コンバーター
+
+ブラウザだけで動く画像形式変換ツールです。画像はサーバーに送信されず、すべて手元で処理されます。
+
+- 入力: PNG / JPEG / WebP / GIF / BMP / SVG / AVIF / ICO(ブラウザが読み込める形式)
+- 出力: PNG / JPEG / WebP / AVIF(対応ブラウザのみ) / GIF / BMP / ICO
+- 複数ファイル、ドラッグ&ドロップ、貼り付け、画質・背景色・幅指定、ZIP一括保存
+
+## 使い方
+`index.html` をブラウザで開くだけ。ビルド不要・依存ライブラリなし。
+GitHub Pages で公開する場合は Settings → Pages → Branch: main / root を選択。
